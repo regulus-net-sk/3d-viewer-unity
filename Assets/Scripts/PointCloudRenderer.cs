@@ -29,6 +29,12 @@ public class PointCloudRenderer : MonoBehaviour
             pointMaterial = CreateDefaultMaterial();
         }
         meshRenderer.material = pointMaterial;
+        
+        // 両面描画を設定（どのシェーダーでも有効）
+        if (meshRenderer.material != null)
+        {
+            meshRenderer.material.SetInt("_Cull", 0); // Cull Off
+        }
 
         InitializeMesh();
     }
@@ -127,6 +133,8 @@ public class PointCloudRenderer : MonoBehaviour
     {
         Material mat = new Material(Shader.Find("Standard"));
         mat.color = pointColor;
+        // 両面描画にする（裏面カリングを無効化）
+        mat.SetInt("_Cull", 0); // Cull Off
         return mat;
     }
 
@@ -151,7 +159,48 @@ public class PointCloudRenderer : MonoBehaviour
         if (meshRenderer != null && meshRenderer.material != null)
         {
             meshRenderer.material.color = color;
+            // 両面描画を維持
+            meshRenderer.material.SetInt("_Cull", 0); // Cull Off
         }
+    }
+
+    /// <summary>
+    /// 点群の中心位置を取得
+    /// </summary>
+    public Vector3 GetCenter()
+    {
+        if (currentVertices == null || currentVertices.Count == 0)
+        {
+            return Vector3.zero;
+        }
+
+        Vector3 sum = Vector3.zero;
+        foreach (Vector3 vertex in currentVertices)
+        {
+            sum += vertex;
+        }
+        return sum / currentVertices.Count;
+    }
+
+    /// <summary>
+    /// 点群のバウンディングボックスの中心を取得
+    /// </summary>
+    public Vector3 GetBoundsCenter()
+    {
+        if (currentVertices == null || currentVertices.Count == 0)
+        {
+            return Vector3.zero;
+        }
+
+        // 元の頂点座標から直接計算（メッシュのバウンディングボックスは各点を四角形に展開したものなので使わない）
+        Vector3 min = currentVertices[0];
+        Vector3 max = currentVertices[0];
+        foreach (Vector3 vertex in currentVertices)
+        {
+            min = Vector3.Min(min, vertex);
+            max = Vector3.Max(max, vertex);
+        }
+        return (min + max) * 0.5f;
     }
 
     void OnDestroy()

@@ -1,8 +1,12 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 /// <summary>
 /// UIを管理するクラス
@@ -59,6 +63,13 @@ public class UIManager : MonoBehaviour
             frameRateSlider.value = 30f;
         }
 
+        // ファイルパス表示の初期状態を設定（表示専用）
+        if (filePathInput != null)
+        {
+            filePathInput.interactable = false;
+            filePathInput.text = "未ロード";
+        }
+
         UpdateUI();
     }
 
@@ -67,17 +78,115 @@ public class UIManager : MonoBehaviour
     /// </summary>
     private void OnLoadButtonClicked()
     {
-        string filePath = filePathInput != null && !string.IsNullOrEmpty(filePathInput.text) 
-            ? filePathInput.text 
-            : lastLoadedPath;
+        // ファイル選択ダイアログを表示（Loadボタンからのみロードを行う）
+        string selectedPath = ShowFileOrFolderDialog();
 
-        if (string.IsNullOrEmpty(filePath))
+        // キャンセルされた場合は何もしない
+        if (string.IsNullOrEmpty(selectedPath))
         {
-            Debug.LogWarning("ファイルパスが指定されていません");
+            Debug.Log("ファイル選択がキャンセルされました");
             return;
         }
 
-        LoadOBJFile(filePath);
+        // 選択されたパスを処理
+        ProcessSelectedPath(selectedPath);
+    }
+
+    /// <summary>
+    /// ファイルまたはフォルダ選択ダイアログを表示
+    /// </summary>
+    private string ShowFileOrFolderDialog()
+    {
+#if UNITY_EDITOR
+        // エディタではUnityの標準ダイアログを使用
+        // まずファイル選択ダイアログを表示
+        string path = EditorUtility.OpenFilePanel("OBJファイルまたはフォルダを選択", lastLoadedPath, "obj");
+        
+        // ファイルが選択されなかった場合、フォルダ選択を試みる
+        if (string.IsNullOrEmpty(path))
+        {
+            path = EditorUtility.OpenFolderPanel("OBJファイルを含むフォルダを選択", lastLoadedPath, "");
+        }
+        
+        return path;
+#else
+        // その他のプラットフォームでは入力フィールドを使用
+        Debug.LogWarning("このプラットフォームではファイル選択ダイアログがサポートされていません。入力フィールドを使用してください。");
+        return "";
+#endif
+    }
+
+    /// <summary>
+    /// 選択されたパスを処理（ファイルまたはフォルダ）
+    /// </summary>
+    private void ProcessSelectedPath(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return;
+
+        // 入力フィールドにはファイル名だけを表示（パス入力はさせない）
+        if (filePathInput != null)
+        {
+            filePathInput.text = Path.GetFileName(path);
+        }
+
+        // ファイルの場合
+        if (File.Exists(path))
+        {
+            string extension = Path.GetExtension(path).ToLower();
+            if (extension == ".obj")
+            {
+                LoadOBJFile(path);
+            }
+            else
+            {
+                Debug.LogWarning($"選択されたファイルはOBJファイルではありません: {path}");
+            }
+        }
+        // フォルダの場合
+        else if (Directory.Exists(path))
+        {
+            LoadOBJFilesFromFolder(path);
+        }
+        else
+        {
+            Debug.LogError($"パスが存在しません: {path}");
+        }
+    }
+
+    /// <summary>
+    /// フォルダ内のすべてのOBJファイルを読み込む
+    /// </summary>
+    private void LoadOBJFilesFromFolder(string folderPath)
+    {
+        if (!Directory.Exists(folderPath))
+        {
+            Debug.LogError($"フォルダが見つかりません: {folderPath}");
+            return;
+        }
+
+        // フォルダ内のすべてのOBJファイルを取得（名前順にソート）
+        string[] objFiles = Directory.GetFiles(folderPath, "*.obj", SearchOption.TopDirectoryOnly)
+            .OrderBy(f => f)
+            .ToArray();
+
+        if (objFiles.Length == 0)
+        {
+            Debug.LogWarning($"フォルダ内にOBJファイルが見つかりません: {folderPath}");
+            return;
+        }
+
+        Debug.Log($"フォルダ内のOBJファイル数: {objFiles.Length}");
+
+        // 複数ファイルの場合はアニメーションとして読み込む
+        if (objFiles.Length == 1)
+        {
+            LoadOBJFile(objFiles[0]);
+        }
+        else
+        {
+            LoadOBJFiles(objFiles.ToList());
+        }
     }
 
     /// <summary>
