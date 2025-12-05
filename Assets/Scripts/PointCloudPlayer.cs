@@ -12,17 +12,19 @@ public class PointCloudPlayer : MonoBehaviour
     [SerializeField] private bool loop = true; // ループ再生
 
     private List<List<Vector3>> frames = new List<List<Vector3>>();
+    private List<List<Color>> frameColors = new List<List<Color>>(); // 各フレームの色情報
+    private bool hasColorData = false; // 色情報があるかどうか
     private int currentFrameIndex = 0;
     private bool isPlaying = false;
     private float frameTimer = 0f;
-    private PointCloudRenderer renderer;
+    private PointCloudRenderer pointCloudRenderer;
 
     void Start()
     {
-        renderer = GetComponent<PointCloudRenderer>();
-        if (renderer == null)
+        pointCloudRenderer = GetComponent<PointCloudRenderer>();
+        if (pointCloudRenderer == null)
         {
-            renderer = gameObject.AddComponent<PointCloudRenderer>();
+            pointCloudRenderer = gameObject.AddComponent<PointCloudRenderer>();
         }
     }
 
@@ -48,10 +50,44 @@ public class PointCloudPlayer : MonoBehaviour
     public void SetFrames(List<List<Vector3>> animationFrames)
     {
         frames = animationFrames;
+        frameColors.Clear();
+        hasColorData = false;
         currentFrameIndex = 0;
-        if (frames.Count > 0)
+        if (frames.Count > 0 && pointCloudRenderer != null)
         {
-            renderer.RenderPoints(frames[0]);
+            pointCloudRenderer.RenderPoints(frames[0]);
+        }
+    }
+
+    /// <summary>
+    /// アニメーションフレームを設定（色情報付き）
+    /// </summary>
+    /// <param name="animationFrames">各フレームの頂点データ</param>
+    /// <param name="colors">各フレームの色データ</param>
+    public void SetFramesWithColors(List<List<Vector3>> animationFrames, List<List<Color>> colors)
+    {
+        frames = animationFrames;
+        if (colors != null && colors.Count == animationFrames.Count)
+        {
+            frameColors = new List<List<Color>>(colors);
+            hasColorData = true;
+        }
+        else
+        {
+            frameColors.Clear();
+            hasColorData = false;
+        }
+        currentFrameIndex = 0;
+        if (frames.Count > 0 && pointCloudRenderer != null)
+        {
+            if (hasColorData && frameColors.Count > 0 && frameColors[0].Count == frames[0].Count)
+            {
+                pointCloudRenderer.RenderPointsWithColors(frames[0], frameColors[0]);
+            }
+            else
+            {
+                pointCloudRenderer.RenderPoints(frames[0]);
+            }
         }
     }
 
@@ -104,7 +140,18 @@ public class PointCloudPlayer : MonoBehaviour
             }
         }
 
-        renderer.RenderPoints(frames[currentFrameIndex]);
+        if (pointCloudRenderer != null)
+        {
+            if (hasColorData && currentFrameIndex < frameColors.Count && 
+                frameColors[currentFrameIndex].Count == frames[currentFrameIndex].Count)
+            {
+                pointCloudRenderer.RenderPointsWithColors(frames[currentFrameIndex], frameColors[currentFrameIndex]);
+            }
+            else
+            {
+                pointCloudRenderer.RenderPoints(frames[currentFrameIndex]);
+            }
+        }
     }
 
     /// <summary>
@@ -127,7 +174,18 @@ public class PointCloudPlayer : MonoBehaviour
             }
         }
 
-        renderer.RenderPoints(frames[currentFrameIndex]);
+        if (pointCloudRenderer != null)
+        {
+            if (hasColorData && currentFrameIndex < frameColors.Count && 
+                frameColors[currentFrameIndex].Count == frames[currentFrameIndex].Count)
+            {
+                pointCloudRenderer.RenderPointsWithColors(frames[currentFrameIndex], frameColors[currentFrameIndex]);
+            }
+            else
+            {
+                pointCloudRenderer.RenderPoints(frames[currentFrameIndex]);
+            }
+        }
     }
 
     /// <summary>
@@ -136,9 +194,16 @@ public class PointCloudPlayer : MonoBehaviour
     public void ResetToFirstFrame()
     {
         currentFrameIndex = 0;
-        if (frames.Count > 0)
+        if (frames.Count > 0 && pointCloudRenderer != null)
         {
-            renderer.RenderPoints(frames[0]);
+            if (hasColorData && frameColors.Count > 0 && frameColors[0].Count == frames[0].Count)
+            {
+                pointCloudRenderer.RenderPointsWithColors(frames[0], frameColors[0]);
+            }
+            else
+            {
+                pointCloudRenderer.RenderPoints(frames[0]);
+            }
         }
         Stop();
     }

@@ -21,16 +21,41 @@ public class CameraController : MonoBehaviour
     [Header("回転中心")]
     [SerializeField] private Transform rotationTarget; // 回転中心となるオブジェクト（PointCloudObjectなど）
 
+    [Header("自動リセット設定")]
+    [SerializeField] private bool autoResetWhenOutOfView = true; // 点群がビューから外れたときに自動リセット
+    [SerializeField] private float resetCheckInterval = 0.5f; // チェック間隔（秒）
+    [SerializeField] private float resetSmoothTime = 1.0f; // リセット時のスムーズ移動時間
+
     private Vector3 lastMousePosition;
     private bool isRotating = false;
     private bool isPanning = false;
     private PointCloudRenderer pointCloudRenderer;
+    
+    // デフォルト位置と回転
+    private Vector3 defaultPosition;
+    private Quaternion defaultRotation;
+    private bool defaultPositionSet = false;
+    
+    // リセットチェック用
+    private float lastResetCheckTime = 0f;
+
+    void Start()
+    {
+        // デフォルト位置と回転を保存
+        SaveDefaultCameraPosition();
+    }
 
     void Update()
     {
         HandleRotation();
         HandleZoom();
         HandlePan();
+        
+        // 点群がビューから外れた場合の自動リセット
+        if (autoResetWhenOutOfView)
+        {
+            CheckAndResetIfOutOfView();
+        }
     }
 
     /// <summary>
@@ -189,6 +214,121 @@ public class CameraController : MonoBehaviour
             Vector3 up = transform.up * delta.y * panSpeed;
             transform.position += right + up;
             lastMousePosition = Input.mousePosition;
+        }
+    }
+
+    /// <summary>
+    /// デフォルトのカメラ位置と回転を保存
+    /// </summary>
+    private void SaveDefaultCameraPosition()
+    {
+        defaultPosition = transform.position;
+        defaultRotation = transform.rotation;
+        defaultPositionSet = true;
+    }
+
+    /// <summary>
+    /// カメラをデフォルト位置にリセット
+    /// </summary>
+    public void ResetToDefaultPosition()
+    {
+        if (!defaultPositionSet)
+        {
+            SaveDefaultCameraPosition();
+        }
+        
+        if (resetSmoothTime > 0f)
+        {
+            // スムーズに移動
+            StartCoroutine(SmoothResetToDefault());
+        }
+        else
+        {
+            // 即座に移動
+            transform.position = defaultPosition;
+            transform.rotation = defaultRotation;
+        }
+    }
+
+    /// <summary>
+    /// スムーズにデフォルト位置にリセット
+    /// </summary>
+    private System.Collections.IEnumerator SmoothResetToDefault()
+    {
+        Vector3 startPosition = transform.position;
+        Quaternion startRotation = transform.rotation;
+        float elapsed = 0f;
+
+        while (elapsed < resetSmoothTime)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / resetSmoothTime;
+            t = Mathf.SmoothStep(0f, 1f, t); // スムーズな補間
+
+            transform.position = Vector3.Lerp(startPosition, defaultPosition, t);
+            transform.rotation = Quaternion.Lerp(startRotation, defaultRotation, t);
+
+            yield return null;
+        }
+
+        transform.position = defaultPosition;
+        transform.rotation = defaultRotation;
+    }
+
+    /// <summary>
+    /// 点群がビューから外れているかチェックし、外れている場合はリセット
+    /// </summary>
+    private void CheckAndResetIfOutOfView()
+    {
+        // チェック間隔を考慮
+        if (Time.time - lastResetCheckTime < resetCheckInterval)
+        {
+            return;
+        }
+        lastResetCheckTime = Time.time;
+
+        PointCloudRenderer renderer = GetPointCloudRenderer();
+        if (renderer == null)
+        {
+            return;
+        }
+
+        // 点群のバウンディングボックスを取得
+        Vector3 boundsCenter = renderer.GetBoundsCenter();
+        if (boundsCenter == Vector3.zero)
+        {
+            return; // 点群がまだロードされていない
+        }
+
+        // Transformの位置を考慮
+        if (renderer.transform != null)
+        {
+            boundsCenter += renderer.transform.position;
+        }
+
+        // カメラの視錐台内に点群の中心があるかチェック
+        Camera cam = GetComponent<Camera>();
+        if (cam == null)
+        {
+            cam = Camera.main;
+        }
+
+        if (cam != null)
+        {
+            Vector3 viewportPoint = cam.WorldToViewportPoint(boundsCenter);
+            
+            // ビューポート外（X, Y, Zが範囲外）の場合、リセット
+            // Z < 0 はカメラの後ろ、Z > 1 は遠すぎる
+            // X, Y が 0-1 の範囲外は画面外
+            bool isOutOfView = viewportPoint.z < 0 || 
+                               viewportPoint.x < -0.5f || viewportPoint.x > 1.5f ||
+                               viewportPoint.y < -0.5f || viewportPoint.y > 1.5f;
+
+            if (isOutOfView)
+            {
+                Debug.Log("点群がビューから外れました。カメラをデフォルト位置にリセットします。");
+                ResetToDefaultPosition();
+            }
         }
     }
 }

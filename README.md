@@ -9,6 +9,7 @@ UnityとC#で作成されたOBJファイルを読み込んで3D点群を表示�
 - **再生/停止**: 複数のOBJファイルを時系列で再生・停止
 - **コマ送り**: フレーム単位で前後に移動
 - **カメラ操作**: マウスでカメラを回転・ズーム・パン
+- **床の表示**: Y=0にグリッド付きの床を表示（空間の把握とスケール感の理解に役立ちます）
 
 ## セットアップ
 
@@ -39,6 +40,7 @@ UnityとC#で作成されたOBJファイルを読み込んで3D点群を表示�
 2. シーンに以下のGameObjectを追加：
    - **Main Camera**: カメラに`CameraController`スクリプトをアタッチ
    - **PointCloudObject**: 空のGameObjectを作成し、`PointCloudPlayer`と`PointCloudRenderer`スクリプトをアタッチ
+   - **Floor** (オプション): 空のGameObjectを作成し、`FloorRenderer`スクリプトをアタッチ（Y=0に床を表示）
    - **Canvas**: UI用のCanvasを作成（`GameObject > UI > Canvas`）
 
 ### 3. UIの設定
@@ -112,6 +114,9 @@ UI要素と点群プレイヤーを連携させ、ユーザー操作を処理し
 
 ### CameraController.cs
 マウス操作でカメラを制御します。
+
+### FloorRenderer.cs
+Y=0にグリッド付きの床を表示します。色、透明度、グリッド間隔などを調整可能です。
 
 ## 注意事項
 
